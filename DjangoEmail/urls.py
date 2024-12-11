@@ -23,4 +23,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('send-email', EmailAPI.as_view(), name='send-email'),
     path('', frontend, name='frontend'),
+    #custom email sending API endpoint and frontend view
 ]
