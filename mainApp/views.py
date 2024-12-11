@@ -61,25 +61,34 @@ class EmailAPI(APIView):
             print(f"Error sending email: {e}")
 
     @staticmethod
-    def parse_time_from_message(body_message):
-        time_pattern = r"(\d{1,2}:\d{2}[APMapm]{2})"
-        match = re.search(time_pattern, body_message)
+    def parse_time_and_date_from_message(body_message):
+        """
+        Parses the date and time from the body message.
+        Expected format: 'YYYY-MM-DD HH:MMAM/PM' or just 'HH:MMAM/PM'.
+        """
+        datetime_pattern = r"(\d{4}-\d{2}-\d{2})?\s*(\d{1,2}:\d{2}[APMapm]{2})"
+        match = re.search(datetime_pattern, body_message)
         if match:
-            time_str = match.group(1)
-            return datetime.strptime(time_str, "%I:%M%p").time()
+            date_str = match.group(1)  # Optional date
+            time_str = match.group(2)  # Required time
+            # Use today's date if no date is specified
+            if date_str:
+                date_part = datetime.strptime(date_str, "%Y-%m-%d").date()
+            else:
+                date_part = datetime.now().date()
+
+            time_part = datetime.strptime(time_str, "%I:%M%p").time()
+            return datetime.combine(date_part, time_part)
         else:
-            raise ValueError("No valid time found in the message.")
+            raise ValueError("No valid date and time found in the message.")
 
     def get_schedule_time(self, body_message):
-        meeting_time = self.parse_time_from_message(body_message)
-        today = datetime.now().date()
+        meeting_datetime = self.parse_time_and_date_from_message(body_message)
         now = datetime.now()
 
-        meeting_datetime = datetime.combine(today, meeting_time)
-
-        # If the calculated time has already passed today, move to the next day
+        # If the specified datetime has already passed, raise an error
         if meeting_datetime <= now:
-            meeting_datetime += timedelta(days=1)
+            raise ValueError("The specified date and time have already passed.")
 
         # Calculate 10 minutes before the scheduled time
         target_time = meeting_datetime - timedelta(minutes=10)
