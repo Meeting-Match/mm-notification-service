@@ -136,7 +136,7 @@ EMAIL_PORT = 587
 EMAIL_TIMEOUT = 300 # in seconds
 
 
-'''
+'''#Add in function later
 EMAIL_HOST = '<smtp.yourserver.com>'
 EMAIL_HOST_USER = 'your@djangoapp.com'
 EMAIL_HOST_PASSWORD ='your password'
