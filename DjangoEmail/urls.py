@@ -23,14 +23,15 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('send-email', EmailAPI.as_view(), name='send-email'),
 ]
-#ex get request  http://127.0.0.1:8000/send-email?subject=Meeting%20Reminder&text=The%20meeting%20is%20set%20for%208:46PM&recipient_list=ndemssie762@gmail.com,nathandemssie@gmail.com"""
 """
+ex get request: GET /send-email?subject=Meeting&text=The%20meeting%20is%20on%202024-12-20%209:00AM&recipient_list=ndemssie762@gmail.com
+
 HTTP 200 OK
 Allow: GET, HEAD, OPTIONS
 Content-Type: application/json
 Vary: Accept
 
 {
-    "msg": "Email scheduled to be sent at 2024-12-11 20:36:00."
+    "msg": "Email scheduled to be sent at 2024-12-20 08:50:00."
 }
 """
