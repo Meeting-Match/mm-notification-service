@@ -127,7 +127,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/New_York'
 
 USE_I18N = True
 
@@ -146,14 +146,14 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-#send email funtionality
+# send email funtionality
 
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_HOST_USER = 'dbuserdbuser588@gmail.com'
 EMAIL_HOST_PASSWORD = 'wzhy ucbi tilg uxjx'
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
-EMAIL_TIMEOUT = 300 # in seconds
+EMAIL_TIMEOUT = 300  # in seconds
 
 
 '''#Add in function later
