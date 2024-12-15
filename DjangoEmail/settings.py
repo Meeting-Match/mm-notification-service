@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'DjangoEmail.middleware.CorrelationIdMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -165,3 +166,31 @@ EMAIL_PORT = 587
 EMAIL_TIMEOUT = 300 # in seconds
 DEFAULT_FROM_EMAIL = 'sender name <your@djangoapp.com>'
 '''
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {name} {message} CorrelationID={correlation_id}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'notification': {  # Logger specific to the notification service
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,  # Prevent duplicate logs in the root logger
+        },
+    },
+}

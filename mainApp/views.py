@@ -5,9 +5,18 @@ from rest_framework.response import Response
 from datetime import datetime, timedelta
 import threading
 import re
+import logging
+
+logger = logging.getLogger('notification')
+
+def get_correlation_id(request):
+    return getattr(request, 'correlation_id', 'N/A')
 
 class EmailAPI(APIView):
     def get(self, request):
+        correlation_id = get_correlation_id(request)
+        logger.info('Incoming GET request to schedule email.', extra={'correlation_id': correlation_id})
+
         subject = self.request.GET.get('subject')
         txt_ = self.request.GET.get('text')
         html_ = self.request.GET.get('html')
@@ -15,11 +24,13 @@ class EmailAPI(APIView):
         from_email = settings.EMAIL_HOST_USER
 
         if not subject or not recipient_list or (not txt_ and not html_):
+            logger.warning('Invalid request: Missing subject, recipient list, or body.', extra={'correlation_id': correlation_id})
             return Response(
                 {'msg': 'Subject, recipient list, and either HTML or Text are required.'},
                 status=400
             )
         if html_ and txt_:
+            logger.warning('Invalid request: Both HTML and Text provided.', extra={'correlation_id': correlation_id})
             return Response(
                 {'msg': 'You can either use HTML or Text, not both.'},
                 status=400
@@ -29,11 +40,13 @@ class EmailAPI(APIView):
         try:
             target_time = self.get_schedule_time(txt_ or html_)
         except ValueError as e:
+            logger.error(f'Error parsing time: {e}', extra={'correlation_id': correlation_id})
             return Response({'msg': str(e)}, status=400)
 
         # Schedule the email
         delay_seconds = (target_time - datetime.now()).total_seconds()
         if delay_seconds > 0:
+            logger.info(f"Scheduling email '{subject}' to {recipient_list} at {target_time}.", extra={'correlation_id': correlation_id})
             threading.Timer(
                 delay_seconds,
                 self.send_email,
@@ -44,10 +57,12 @@ class EmailAPI(APIView):
                 status=200
             )
         else:
+            logger.warning('Failed to schedule email: Target time already passed.', extra={'correlation_id': correlation_id}
             return Response({'msg': 'The specified time has already passed.'}, status=400)
 
     def send_email(self, subject, text, html, recipient_list, from_email):
         try:
+            logger.info(f"Sending email '{subject}' to {recipient_list}.", extra={'correlation_id': get_correlation_id()})
             send_mail(
                 subject,
                 text,
@@ -56,9 +71,9 @@ class EmailAPI(APIView):
                 html_message=html,
                 fail_silently=False,
             )
-            print(f"Email sent successfully to {recipient_list}")
+            logger.info(f'Email successfully sent to {recipient_list}.', extra={'correlation_id': get_correlation_id()})
         except Exception as e:
-            print(f"Error sending email: {e}")
+            logger.error(f'Error sending email: {e}', extra={'correlation_id': get_correlation_id()})
 
     @staticmethod
     def parse_time_and_date_from_message(body_message):

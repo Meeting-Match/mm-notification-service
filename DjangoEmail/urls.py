@@ -15,13 +15,26 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
 from mainApp.views import EmailAPI
 from django.urls import path
+import logging
+
+logger = logging.getLogger('notification')
+
+def log_request_with_correlation_id(view):
+    """
+    Decorator to log requests with Correlation ID at the URL level.
+    """
+    def wrapper(request, *args, **kwargs):
+        correlation_id = getattr(request, 'correlation_id', 'N/A')
+        logger.info(f'Request received: {request.method} {request.path}',
+                    extra={'correlation_id': correlation_id})
+        return view(request, *args, **kwargs)
+    return wrapper
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('send-email', EmailAPI.as_view(), name='send-email'),
+    path('send-email', log_request_with_correlation_id(EmailAPI.as_view()), name='send-email'),
 ]
 """
 ex get request: GET /send-email?subject=Meeting&text=The%20meeting%20is%20on%202024-12-20%209:00AM&recipient_list=ndemssie762@gmail.com
