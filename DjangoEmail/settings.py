@@ -170,9 +170,19 @@ DEFAULT_FROM_EMAIL = 'sender name <your@djangoapp.com>'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'add_correlation_id': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda record: setattr(record, 'correlation_id', getattr(record, 'correlation_id', 'N/A')) or True,
+        },
+    },
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {name} {message} CorrelationID={correlation_id}',
+            'format': '{levelname} {asctime} {module} {message} {correlation_id}',
+            'style': '{',
+        },
+        'default': {
+            'format': '{levelname} {asctime} {message} {correlation_id}',
             'style': '{',
         },
     },
@@ -180,17 +190,23 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['add_correlation_id'],
         },
     },
     'loggers': {
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': True,
         },
-        'notification': {  # Logger specific to the notification service
+        'notification': {  # Logger for your app
             'handlers': ['console'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevent duplicate logs in the root logger
+            'propagate': False,
         },
+    },
+    'root': {  # Added to handle logs from unnamed loggers
+        'handlers': ['console'],
+        'level': 'INFO',
     },
 }

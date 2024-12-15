@@ -57,7 +57,7 @@ class EmailAPI(APIView):
                 status=200
             )
         else:
-            logger.warning('Failed to schedule email: Target time already passed.', extra={'correlation_id': correlation_id}
+            logger.warning('Failed to schedule email: Target time already passed.', extra={'correlation_id': correlation_id})
             return Response({'msg': 'The specified time has already passed.'}, status=400)
 
     def send_email(self, subject, text, html, recipient_list, from_email):
