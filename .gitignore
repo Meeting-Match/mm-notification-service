@@ -8,3 +8,4 @@ venv/
 .env
 us-east-2-bundle.pem
 __pycache__/
+*.pyc

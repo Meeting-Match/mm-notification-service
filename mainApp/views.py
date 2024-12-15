@@ -4,7 +4,6 @@ from django.core.mail import send_mail
 from rest_framework.response import Response
 from datetime import datetime, timedelta
 import threading
-import re
 import logging
 
 logger = logging.getLogger('notification')
@@ -12,100 +11,119 @@ logger = logging.getLogger('notification')
 def get_correlation_id(request):
     return getattr(request, 'correlation_id', 'N/A')
 
+
 class EmailAPI(APIView):
-    def get(self, request):
+    def post(self, request):
+        """
+        Schedule an email to be sent at a specified time.
+
+        Expected request body:
+        {
+            "subject": "Email Subject",
+            "body": "Email body content",
+            "recipient_list": "recipient1@example.com,recipient2@example.com",
+            "time": "2024-01-15 14:30",
+            "html": "<p>Optional HTML content</p>" (optional)
+        }
+        """
         correlation_id = get_correlation_id(request)
-        logger.info('Incoming GET request to schedule email.', extra={'correlation_id': correlation_id})
+        logger.info('Incoming POST request to schedule an email.', extra={'correlation_id': correlation_id})
 
-        subject = self.request.GET.get('subject')
-        txt_ = self.request.GET.get('text')
-        html_ = self.request.GET.get('html')
-        recipient_list = self.request.GET.get('recipient_list')
-        from_email = settings.EMAIL_HOST_USER
+        data = request.data
 
-        if not subject or not recipient_list or (not txt_ and not html_):
-            logger.warning('Invalid request: Missing subject, recipient list, or body.', extra={'correlation_id': correlation_id})
+        # Extract data from the request body
+        subject = data.get('subject')
+        body = data.get('body')
+        html = data.get('html')
+        recipient_list = data.get('recipient_list')
+        time_str = data.get('time')
+
+        # Validate required fields
+        if not all([subject, body, recipient_list, time_str]):
+            logger.warning('Missing required fields in request.', extra={'correlation_id': correlation_id})
             return Response(
-                {'msg': 'Subject, recipient list, and either HTML or Text are required.'},
+                {'msg': 'Subject, body, recipient list, and time are required.'},
                 status=400
             )
-        if html_ and txt_:
-            logger.warning('Invalid request: Both HTML and Text provided.', extra={'correlation_id': correlation_id})
-            return Response(
-                {'msg': 'You can either use HTML or Text, not both.'},
-                status=400
-            )
 
-        # Parse the time from the body message if exists
+        # Validate time
         try:
-            target_time = self.get_schedule_time(txt_ or html_)
+            target_time = self.parse_datetime(time_str)
         except ValueError as e:
             logger.error(f'Error parsing time: {e}', extra={'correlation_id': correlation_id})
             return Response({'msg': str(e)}, status=400)
 
+        # Prepare email details
+        from_email = settings.EMAIL_HOST_USER
+        recipients = recipient_list.split(',')
+
         # Schedule the email
         delay_seconds = (target_time - datetime.now()).total_seconds()
+
         if delay_seconds > 0:
             logger.info(f"Scheduling email '{subject}' to {recipient_list} at {target_time}.", extra={'correlation_id': correlation_id})
             threading.Timer(
                 delay_seconds,
                 self.send_email,
-                args=(subject, txt_, html_, recipient_list.split(','), from_email)
+                args=(subject, body, html, recipients, from_email, correlation_id)
             ).start()
+
             return Response(
-                {'msg': f"Email scheduled to be sent at {target_time.strftime('%Y-%m-%d %H:%M:%S')}."},
+                {'msg': f"Email scheduled to be sent at {
+                    target_time.strftime('%Y-%m-%d %H:%M:%S')}."},
                 status=200
             )
         else:
             logger.warning('Failed to schedule email: Target time already passed.', extra={'correlation_id': correlation_id})
             return Response({'msg': 'The specified time has already passed.'}, status=400)
 
-    def send_email(self, subject, text, html, recipient_list, from_email):
+    def send_email(self, subject, body, html, recipient_list, from_email, correlation_id):
+        """
+        Send an email with optional HTML content.
+
+        Args:
+            subject (str): Email subject
+            body (str): Plain text email body
+            html (str, optional): HTML version of the email
+            recipient_list (list): List of recipient email addresses
+            from_email (str): Sender's email address
+        """
         try:
-            logger.info(f"Sending email '{subject}' to {recipient_list}.", extra={'correlation_id': get_correlation_id()})
+            logger.info(f"Sending email '{subject}' to {recipient_list}.", extra={'correlation_id': correlation_id})
             send_mail(
                 subject,
-                text,
+                body,
                 from_email,
                 recipient_list,
                 html_message=html,
                 fail_silently=False,
             )
-            logger.info(f'Email successfully sent to {recipient_list}.', extra={'correlation_id': get_correlation_id()})
+            logger.info(f'Email successfully sent to {recipient_list}.', extra={'correlation_id': correlation_id})
         except Exception as e:
-            logger.error(f'Error sending email: {e}', extra={'correlation_id': get_correlation_id()})
+            logger.error(f'Error sending email: {e}', extra={'correlation_id': correlation_id})
 
     @staticmethod
-    def parse_time_and_date_from_message(body_message):
+    def parse_datetime(time_str):
         """
-        Parses the date and time from the body message.
-        Expected format: 'YYYY-MM-DD HH:MMAM/PM' or just 'HH:MMAM/PM'.
+        Parse a datetime string in the format 'YYYY-MM-DD HH:MM'.
+
+        Args:
+            time_str (str): Datetime string to parse
+
+        Returns:
+            datetime: Parsed datetime object
+
+        Raises:
+            ValueError: If the datetime string is invalid
         """
-        datetime_pattern = r"(\d{4}-\d{2}-\d{2})?\s*(\d{1,2}:\d{2}[APMapm]{2})"
-        match = re.search(datetime_pattern, body_message)
-        if match:
-            date_str = match.group(1)  # Optional date
-            time_str = match.group(2)  # Required time
-            # Use today's date if no date is specified
-            if date_str:
-                date_part = datetime.strptime(date_str, "%Y-%m-%d").date()
-            else:
-                date_part = datetime.now().date()
+        try:
+            # Parse the datetime string
+            target_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
 
-            time_part = datetime.strptime(time_str, "%I:%M%p").time()
-            return datetime.combine(date_part, time_part)
-        else:
-            raise ValueError("No valid date and time found in the message.")
-
-    def get_schedule_time(self, body_message):
-        meeting_datetime = self.parse_time_and_date_from_message(body_message)
-        now = datetime.now()
-
-        # If the specified datetime has already passed, raise an error
-        if meeting_datetime <= now:
-            raise ValueError("The specified date and time have already passed.")
-
-        # Calculate 10 minutes before the scheduled time
-        target_time = meeting_datetime - timedelta(minutes=10)
-        return target_time
-
+            # Check if the time is in the future
+            now = datetime.now()
+            if target_time <= now:
+                raise ValueError("The specified date and time have already passed.")
+            return target_time
+        except ValueError:
+            raise ValueError("Invalid datetime format. Use 'YYYY-MM-DD HH:MM'.")
