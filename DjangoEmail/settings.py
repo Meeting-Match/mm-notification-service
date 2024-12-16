@@ -190,7 +190,7 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
-            'filters': ['add_correlation_id'],
+            'filters': ['add_correlation_id'],  # Attach the filter
         },
     },
     'loggers': {
@@ -199,13 +199,18 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
-        'notification': {  # Logger for your app
+        'django.server': {  # Prevent duplicate basehttp logs
+            'handlers': [],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'notification': {  # Logger for the notification app
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,
         },
     },
-    'root': {  # Added to handle logs from unnamed loggers
+    'root': {  # Catch-all logger
         'handlers': ['console'],
         'level': 'INFO',
     },
